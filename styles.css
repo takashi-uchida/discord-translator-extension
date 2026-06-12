@@ -1,0 +1,55 @@
+/* Position the button relative to the message list item */
+li[id^="chat-messages-"],
+[class*="messageListItem"] {
+  position: relative;
+}
+
+.djt-btn {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  padding: 2px 5px;
+  background: rgba(30, 31, 34, 0.85);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+li[id^="chat-messages-"]:hover .djt-btn,
+[class*="messageListItem"]:hover .djt-btn,
+.djt-btn:focus,
+.djt-btn.active {
+  opacity: 1;
+}
+
+.djt-btn:hover {
+  background: rgba(88, 101, 242, 0.5);
+}
+
+.djt-btn:disabled {
+  cursor: default;
+}
+
+.djt-result.djt-error {
+  border-left-color: #ed4245;
+  background-color: rgba(237, 66, 69, 0.12);
+  color: #ed4245;
+}
+
+.djt-result {
+  display: block;
+  margin: 4px 8px 4px 72px;
+  padding: 6px 10px;
+  background-color: rgba(88, 101, 242, 0.12);
+  border-left: 3px solid #5865f2;
+  border-radius: 0 4px 4px 0;
+  color: #dcddde;
+  font-size: 14px;
+  line-height: 1.375;
+  white-space: pre-wrap;
+}

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 280px;
+      padding: 16px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      background: #313338;
+      color: #dcddde;
+      margin: 0;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      color: #fff;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      color: #b5bac1;
+    }
+    input {
+      width: 100%;
+      padding: 7px 9px;
+      background: #1e1f22;
+      border: 1px solid #4e5058;
+      border-radius: 4px;
+      color: #dcddde;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #5865f2;
+    }
+    button {
+      margin-top: 10px;
+      width: 100%;
+      padding: 8px;
+      background: #5865f2;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover { background: #4752c4; }
+    #status {
+      margin-top: 8px;
+      font-size: 12px;
+      min-height: 16px;
+      color: #57f287;
+    }
+    #status.error { color: #ed4245; }
+  </style>
+</head>
+<body>
+  <h2>Discord 日本語翻訳</h2>
+  <label>DeepL API キー</label>
+  <input type="text" id="apiKey" placeholder="xxxx:fx" autocomplete="off" spellcheck="false">
+  <div style="display:flex;gap:6px;margin-top:10px">
+    <button id="save" style="flex:1">保存</button>
+    <button id="test" style="flex:1;background:#2d2f32;border:1px solid #4e5058">テスト</button>
+  </div>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

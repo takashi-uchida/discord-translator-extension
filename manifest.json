@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Discord 日本語翻訳",
+  "version": "1.0.0",
+  "description": "Discordのメッセージを日本語に翻訳します（DeepL使用）",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://discord.com/*",
+    "https://api-free.deepl.com/*",
+    "https://api.deepl.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://discord.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Discord 日本語翻訳"
+  }
+}
