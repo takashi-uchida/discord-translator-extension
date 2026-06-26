@@ -175,11 +175,12 @@ jobs:
             --data-urlencode "refresh_token=${CHROME_REFRESH_TOKEN}" \
             --data-urlencode 'grant_type=refresh_token')"
 
-          access_token="$(python3 <<'PY' <<< "$token_response"
+          access_token="$(TOKEN_RESPONSE="$token_response" python3 <<'PY'
           import json
+          import os
           import sys
 
-          data = json.load(sys.stdin)
+          data = json.loads(os.environ['TOKEN_RESPONSE'])
           token = data.get('access_token')
           if not token:
               print(f"::error::Failed to fetch access token: {data.get('error_description') or data.get('error')}", file=sys.stderr)
@@ -237,11 +238,12 @@ jobs:
             --data-urlencode "refresh_token=${CHROME_REFRESH_TOKEN}" \
             --data-urlencode 'grant_type=refresh_token')"
 
-          access_token="$(python3 <<'PY' <<< "$token_response"
+          access_token="$(TOKEN_RESPONSE="$token_response" python3 <<'PY'
           import json
+          import os
           import sys
 
-          data = json.load(sys.stdin)
+          data = json.loads(os.environ['TOKEN_RESPONSE'])
           token = data.get('access_token')
           if not token:
               print(f"::error::Failed to fetch access token: {data.get('error_description') or data.get('error')}", file=sys.stderr)
