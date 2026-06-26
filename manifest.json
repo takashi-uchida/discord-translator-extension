@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Discord 日本語翻訳",
-  "version": "1.0.0",
-  "description": "Discordのメッセージを日本語に翻訳します（DeepL使用）",
+  "version": "1.1.0",
+  "description": "Discordのメッセージを日本語に翻訳し、入力中の日本語を英語に翻訳します（DeepL使用）",
   "permissions": ["storage"],
   "host_permissions": [
     "https://discord.com/*",
