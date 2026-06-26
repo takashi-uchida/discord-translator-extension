@@ -53,3 +53,63 @@ li[id^="chat-messages-"]:hover .djt-btn,
   line-height: 1.375;
   white-space: pre-wrap;
 }
+
+/* Composer Japanese -> English translation */
+.djt-input-anchor {
+  position: relative;
+}
+
+.djt-input-btn {
+  position: absolute;
+  right: 52px;
+  bottom: 8px;
+  z-index: 1000;
+  min-width: 42px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(88, 101, 242, 0.92);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.djt-input-btn:hover {
+  background: rgba(71, 82, 196, 0.96);
+}
+
+.djt-input-btn:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.djt-input-btn[hidden] {
+  display: none;
+}
+
+.djt-input-status {
+  position: absolute;
+  right: 12px;
+  bottom: 38px;
+  z-index: 1000;
+  max-width: min(320px, 70%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(30, 31, 34, 0.92);
+  color: #57f287;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.djt-input-status:empty {
+  display: none;
+}
+
+.djt-input-status.djt-input-status-error {
+  color: #ed4245;
+}
