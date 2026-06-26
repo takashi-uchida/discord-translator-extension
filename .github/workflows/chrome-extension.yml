@@ -1,0 +1,274 @@
+name: Chrome Extension
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      upload_to_chrome_web_store:
+        description: Upload the packaged extension to Chrome Web Store using repository secrets
+        required: true
+        type: boolean
+        default: false
+      publish:
+        description: Publish after upload. This can still require Chrome Web Store review.
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package extension
+    runs-on: ubuntu-latest
+    env:
+      CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+      CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+      CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+      CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate manifest
+        run: |
+          python3 <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path('.')
+          manifest_path = root / 'manifest.json'
+          if not manifest_path.is_file():
+              print('::error::manifest.json is missing')
+              sys.exit(1)
+
+          try:
+              manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          except Exception as exc:
+              print(f'::error::manifest.json is invalid JSON: {exc}')
+              sys.exit(1)
+
+          errors = []
+          for key in ['manifest_version', 'name', 'version', 'description']:
+              if not manifest.get(key):
+                  errors.append(f'manifest.json is missing required field: {key}')
+
+          if manifest.get('manifest_version') != 3:
+              errors.append('manifest_version must be 3')
+
+          referenced_files = []
+          background = manifest.get('background') or {}
+          if background.get('service_worker'):
+              referenced_files.append(background['service_worker'])
+
+          action = manifest.get('action') or {}
+          if action.get('default_popup'):
+              referenced_files.append(action['default_popup'])
+
+          for content_script in manifest.get('content_scripts') or []:
+              referenced_files.extend(content_script.get('js') or [])
+              referenced_files.extend(content_script.get('css') or [])
+
+          for icon_path in (manifest.get('icons') or {}).values():
+              referenced_files.append(icon_path)
+
+          default_icon = action.get('default_icon')
+          if isinstance(default_icon, str):
+              referenced_files.append(default_icon)
+          elif isinstance(default_icon, dict):
+              referenced_files.extend(default_icon.values())
+
+          for file_name in referenced_files:
+              if not (root / file_name).is_file():
+                  errors.append(f'Referenced file is missing: {file_name}')
+
+          if not manifest.get('icons'):
+              print('::warning::manifest.json has no icons. Add 16/48/128px icons before Chrome Web Store submission.')
+          if not action.get('default_icon'):
+              print('::warning::action.default_icon is not set. Add it before Chrome Web Store submission.')
+
+          if errors:
+              for error in errors:
+                  print(f'::error::{error}')
+              sys.exit(1)
+
+          print(f"Manifest OK: {manifest['name']} v{manifest['version']}")
+          PY
+
+      - name: Create extension ZIP
+        id: package
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import pathlib
+          import zipfile
+
+          root = pathlib.Path('.')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          version = manifest['version']
+          dist_dir = root / 'dist'
+          dist_dir.mkdir(exist_ok=True)
+          zip_path = dist_dir / f'discord-translator-extension-v{version}.zip'
+
+          files = set()
+
+          # Include top-level extension source files.
+          for path in root.iterdir():
+              if path.is_file() and path.suffix.lower() in {'.json', '.js', '.css', '.html'}:
+                  files.add(path)
+
+          # Include icon/image assets when present.
+          for asset_dir in ['icons', 'images', 'assets']:
+              directory = root / asset_dir
+              if directory.is_dir():
+                  for path in directory.rglob('*'):
+                      if path.is_file():
+                          files.add(path)
+
+          with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+              for path in sorted(files):
+                  zf.write(path, path.relative_to(root).as_posix())
+
+          print(f'Created {zip_path}')
+          print('Packaged files:')
+          for path in sorted(files):
+              print(f'- {path.relative_to(root).as_posix()}')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              print(f'package_path={zip_path.as_posix()}', file=output)
+              print(f'version={version}', file=output)
+          PY
+
+      - name: Upload packaged extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: discord-translator-extension-v${{ steps.package.outputs.version }}
+          path: ${{ steps.package.outputs.package_path }}
+          if-no-files-found: error
+
+      - name: Upload to Chrome Web Store
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_to_chrome_web_store }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for secret_name in CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN; do
+            if [ -z "${!secret_name}" ]; then
+              echo "::error::Repository secret ${secret_name} is not set"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          token_response="$(curl -sS -X POST 'https://oauth2.googleapis.com/token' \
+            --data-urlencode "client_id=${CHROME_CLIENT_ID}" \
+            --data-urlencode "client_secret=${CHROME_CLIENT_SECRET}" \
+            --data-urlencode "refresh_token=${CHROME_REFRESH_TOKEN}" \
+            --data-urlencode 'grant_type=refresh_token')"
+
+          access_token="$(python3 <<'PY' <<< "$token_response"
+          import json
+          import sys
+
+          data = json.load(sys.stdin)
+          token = data.get('access_token')
+          if not token:
+              print(f"::error::Failed to fetch access token: {data.get('error_description') or data.get('error')}", file=sys.stderr)
+              sys.exit(1)
+          print(token)
+          PY
+          )"
+          echo "::add-mask::${access_token}"
+
+          upload_response="$(curl -sS -X PUT \
+            -H "Authorization: Bearer ${access_token}" \
+            -H 'x-goog-api-version: 2' \
+            -H 'Content-Type: application/zip' \
+            --data-binary "@${{ steps.package.outputs.package_path }}" \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}?uploadType=media")"
+
+          echo "$upload_response" > cws-upload-response.json
+          python3 <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          data = json.loads(pathlib.Path('cws-upload-response.json').read_text(encoding='utf-8'))
+          state = data.get('uploadState')
+          if state != 'SUCCESS':
+              print(f'::error::Chrome Web Store upload failed: {json.dumps(data, ensure_ascii=False)}')
+              sys.exit(1)
+          print('Chrome Web Store upload succeeded')
+          PY
+
+      - name: Publish on Chrome Web Store
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ inputs.upload_to_chrome_web_store }}" != 'true' ]; then
+            echo '::error::Set upload_to_chrome_web_store=true when publish=true.'
+            exit 1
+          fi
+
+          missing=0
+          for secret_name in CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN; do
+            if [ -z "${!secret_name}" ]; then
+              echo "::error::Repository secret ${secret_name} is not set"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          token_response="$(curl -sS -X POST 'https://oauth2.googleapis.com/token' \
+            --data-urlencode "client_id=${CHROME_CLIENT_ID}" \
+            --data-urlencode "client_secret=${CHROME_CLIENT_SECRET}" \
+            --data-urlencode "refresh_token=${CHROME_REFRESH_TOKEN}" \
+            --data-urlencode 'grant_type=refresh_token')"
+
+          access_token="$(python3 <<'PY' <<< "$token_response"
+          import json
+          import sys
+
+          data = json.load(sys.stdin)
+          token = data.get('access_token')
+          if not token:
+              print(f"::error::Failed to fetch access token: {data.get('error_description') or data.get('error')}", file=sys.stderr)
+              sys.exit(1)
+          print(token)
+          PY
+          )"
+          echo "::add-mask::${access_token}"
+
+          publish_response="$(curl -sS -X POST \
+            -H "Authorization: Bearer ${access_token}" \
+            -H 'x-goog-api-version: 2' \
+            -H 'Content-Length: 0' \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${CHROME_EXTENSION_ID}/publish")"
+
+          echo "$publish_response" > cws-publish-response.json
+          python3 <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          data = json.loads(pathlib.Path('cws-publish-response.json').read_text(encoding='utf-8'))
+          status = data.get('status')
+          statuses = status if isinstance(status, list) else [status]
+          ok_statuses = {'OK', 'ITEM_PENDING_REVIEW'}
+          if not any(item in ok_statuses for item in statuses):
+              print(f'::error::Chrome Web Store publish failed: {json.dumps(data, ensure_ascii=False)}')
+              sys.exit(1)
+          print(f'Chrome Web Store publish request accepted: {statuses}')
+          PY
